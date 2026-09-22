@@ -1,0 +1,29 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() { return request.auth != null; }
+    function isAdmin() {
+      return signedIn() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+    function isStudent() {
+      return signedIn() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'student';
+    }
+    match /users/{uid} {
+      allow create: if signedIn() && request.auth.uid == uid && request.resource.data.role == 'student';
+      allow read: if signedIn() && (request.auth.uid == uid || isAdmin());
+      allow update: if isAdmin() || (signedIn() && request.auth.uid == uid && request.resource.data.role == resource.data.role && request.resource.data.email == resource.data.email);
+      allow delete: if isAdmin();
+    }
+    match /lessons/{id} { allow read: if signedIn(); allow write: if isAdmin(); }
+    match /assignments/{id} { allow read: if signedIn(); allow write: if isAdmin(); }
+    match /exams/{id} { allow read: if signedIn(); allow write: if isAdmin(); }
+    match /submissions/{id} {
+      allow create: if isStudent() && request.resource.data.studentId == request.auth.uid;
+      allow read, update, delete: if isAdmin();
+    }
+    match /examSubmissions/{id} {
+      allow create: if isStudent() && request.resource.data.studentId == request.auth.uid;
+      allow read, update, delete: if isAdmin();
+    }
+  }
+}
